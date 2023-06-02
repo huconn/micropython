@@ -1,13 +1,22 @@
+# Select the board to build for:
+ifdef BOARD_DIR
+# Custom board path - remove trailing slash and get the final component of
+# the path as the board name.
+BOARD ?= $(notdir $(BOARD_DIR:/=))
+else
+# If not given on the command line, then default to ADAFRUIT_ITSYBITSY_M4_EXPRESS.
 BOARD ?= ADAFRUIT_ITSYBITSY_M4_EXPRESS
 BOARD_DIR ?= boards/$(BOARD)
-BUILD ?= build-$(BOARD)
-
-CROSS_COMPILE ?= arm-none-eabi-
-UF2CONV ?= $(TOP)/tools/uf2conv.py
+endif
 
 ifeq ($(wildcard $(BOARD_DIR)/.),)
 $(error Invalid BOARD specified: $(BOARD_DIR))
 endif
+
+BUILD ?= build-$(BOARD)
+
+CROSS_COMPILE ?= arm-none-eabi-
+UF2CONV ?= $(TOP)/tools/uf2conv.py
 
 MCU_SERIES_LOWER = $(shell echo $(MCU_SERIES) | tr '[:upper:]' '[:lower:]')
 
@@ -56,7 +65,10 @@ CFLAGS += $(INC) -Wall -Werror -std=c99 -nostdlib -mthumb $(CFLAGS_MCU) -fsingle
 CFLAGS += -DMCU_$(MCU_SERIES) -D__$(CMSIS_MCU)__
 CFLAGS += $(CFLAGS_EXTRA)
 
+CFLAGS += -DMICROPY_HW_CODESIZE=$(MICROPY_HW_CODESIZE)
+
 LDFLAGS += -nostdlib $(addprefix -T,$(LD_FILES)) -Map=$@.map --cref
+LDFLAGS += --defsym=_codesize=$(MICROPY_HW_CODESIZE)
 
 LIBS += $(shell $(CC) $(CFLAGS) -print-libgcc-file-name)
 
@@ -94,7 +106,6 @@ SRC_C += \
 	machine_uart.c \
 	machine_wdt.c \
 	main.c \
-	modutime.c \
 	modmachine.c \
 	modsamd.c \
 	mphalport.c \

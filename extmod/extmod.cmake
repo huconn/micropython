@@ -33,12 +33,16 @@ set(MICROPY_SOURCE_EXTMOD
     ${MICROPY_EXTMOD_DIR}/modusocket.c
     ${MICROPY_EXTMOD_DIR}/modussl_axtls.c
     ${MICROPY_EXTMOD_DIR}/modussl_mbedtls.c
+    ${MICROPY_EXTMOD_DIR}/modutime.c
     ${MICROPY_EXTMOD_DIR}/modutimeq.c
     ${MICROPY_EXTMOD_DIR}/moduwebsocket.c
     ${MICROPY_EXTMOD_DIR}/moduzlib.c
     ${MICROPY_EXTMOD_DIR}/modwebrepl.c
+    ${MICROPY_EXTMOD_DIR}/network_cyw43.c
+    ${MICROPY_EXTMOD_DIR}/network_lwip.c
+    ${MICROPY_EXTMOD_DIR}/network_ninaw10.c
+    ${MICROPY_EXTMOD_DIR}/network_wiznet5k.c
     ${MICROPY_EXTMOD_DIR}/uos_dupterm.c
-    ${MICROPY_EXTMOD_DIR}/utime_mphal.c
     ${MICROPY_EXTMOD_DIR}/vfs.c
     ${MICROPY_EXTMOD_DIR}/vfs_blockdev.c
     ${MICROPY_EXTMOD_DIR}/vfs_fat.c
@@ -150,7 +154,6 @@ if(MICROPY_SSL_MBEDTLS)
         ${MICROPY_LIB_MBEDTLS_DIR}/library/md4.c
         ${MICROPY_LIB_MBEDTLS_DIR}/library/md5.c
         ${MICROPY_LIB_MBEDTLS_DIR}/library/md.c
-        ${MICROPY_LIB_MBEDTLS_DIR}/library/md_wrap.c
         ${MICROPY_LIB_MBEDTLS_DIR}/library/oid.c
         ${MICROPY_LIB_MBEDTLS_DIR}/library/padlock.c
         ${MICROPY_LIB_MBEDTLS_DIR}/library/pem.c
@@ -175,9 +178,11 @@ if(MICROPY_SSL_MBEDTLS)
         ${MICROPY_LIB_MBEDTLS_DIR}/library/ssl_cli.c
         ${MICROPY_LIB_MBEDTLS_DIR}/library/ssl_cookie.c
         ${MICROPY_LIB_MBEDTLS_DIR}/library/ssl_srv.c
+        ${MICROPY_LIB_MBEDTLS_DIR}/library/ssl_msg.c
         ${MICROPY_LIB_MBEDTLS_DIR}/library/ssl_ticket.c
         ${MICROPY_LIB_MBEDTLS_DIR}/library/ssl_tls.c
         ${MICROPY_LIB_MBEDTLS_DIR}/library/timing.c
+        ${MICROPY_LIB_MBEDTLS_DIR}/library/constant_time.c
         ${MICROPY_LIB_MBEDTLS_DIR}/library/x509.c
         ${MICROPY_LIB_MBEDTLS_DIR}/library/x509_create.c
         ${MICROPY_LIB_MBEDTLS_DIR}/library/x509_crl.c

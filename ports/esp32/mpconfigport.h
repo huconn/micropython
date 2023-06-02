@@ -62,12 +62,17 @@
 #define MICROPY_PY_ALL_INPLACE_SPECIAL_METHODS (1)
 #define MICROPY_PY_BUILTINS_HELP_TEXT       esp32_help_text
 #define MICROPY_PY_IO_BUFFEREDWRITER        (1)
-#define MICROPY_PY_UTIME_MP_HAL             (1)
+#define MICROPY_PY_UTIME_GMTIME_LOCALTIME_MKTIME (1)
+#define MICROPY_PY_UTIME_TIME_TIME_NS       (1)
+#define MICROPY_PY_UTIME_INCLUDEFILE        "ports/esp32/modutime.c"
 #define MICROPY_PY_THREAD                   (1)
 #define MICROPY_PY_THREAD_GIL               (1)
 #define MICROPY_PY_THREAD_GIL_VM_DIVISOR    (32)
 
 // extended modules
+#ifndef MICROPY_ESPNOW
+#define MICROPY_ESPNOW                      (1)
+#endif
 #ifndef MICROPY_PY_BLUETOOTH
 #define MICROPY_PY_BLUETOOTH                (1)
 #define MICROPY_PY_BLUETOOTH_USE_SYNC_EVENTS (1)
@@ -86,6 +91,7 @@
 #define MICROPY_PY_UOS_INCLUDEFILE          "ports/esp32/moduos.c"
 #define MICROPY_PY_OS_DUPTERM               (1)
 #define MICROPY_PY_UOS_DUPTERM_NOTIFY       (1)
+#define MICROPY_PY_UOS_SYNC                 (1)
 #define MICROPY_PY_UOS_UNAME                (1)
 #define MICROPY_PY_UOS_URANDOM              (1)
 #define MICROPY_PY_MACHINE                  (1)
@@ -93,9 +99,7 @@
 #define MICROPY_PY_MACHINE_BITSTREAM        (1)
 #define MICROPY_PY_MACHINE_PULSE            (1)
 #define MICROPY_PY_MACHINE_PWM              (1)
-#define MICROPY_PY_MACHINE_PWM_INIT         (1)
 #define MICROPY_PY_MACHINE_PWM_DUTY         (1)
-#define MICROPY_PY_MACHINE_PWM_DUTY_U16_NS  (1)
 #define MICROPY_PY_MACHINE_PWM_INCLUDEFILE  "ports/esp32/machine_pwm.c"
 #define MICROPY_PY_MACHINE_I2C              (1)
 #define MICROPY_PY_MACHINE_I2C_TRANSFER_WRITE1 (1)
@@ -110,6 +114,20 @@
 #ifndef MICROPY_PY_MACHINE_I2S
 #define MICROPY_PY_MACHINE_I2S              (1)
 #endif
+#define MICROPY_PY_NETWORK (1)
+#ifndef MICROPY_PY_NETWORK_HOSTNAME_DEFAULT
+#if CONFIG_IDF_TARGET_ESP32
+#define MICROPY_PY_NETWORK_HOSTNAME_DEFAULT "mpy-esp32"
+#elif CONFIG_IDF_TARGET_ESP32S2
+#define MICROPY_PY_NETWORK_HOSTNAME_DEFAULT "mpy-esp32s2"
+#elif CONFIG_IDF_TARGET_ESP32S3
+#define MICROPY_PY_NETWORK_HOSTNAME_DEFAULT "mpy-esp32s3"
+#elif CONFIG_IDF_TARGET_ESP32C3
+#define MICROPY_PY_NETWORK_HOSTNAME_DEFAULT "mpy-esp32c3"
+#endif
+#endif
+#define MICROPY_PY_NETWORK_INCLUDEFILE      "ports/esp32/modnetwork.h"
+#define MICROPY_PY_NETWORK_MODULE_GLOBALS_INCLUDEFILE "ports/esp32/modnetwork_globals.h"
 #ifndef MICROPY_PY_NETWORK_WLAN
 #define MICROPY_PY_NETWORK_WLAN             (1)
 #endif
@@ -217,3 +235,21 @@ typedef long mp_off_t;
 #endif
 
 void boardctrl_startup(void);
+
+#ifndef MICROPY_PY_NETWORK_LAN
+#if (ESP_IDF_VERSION_MAJOR == 4) && (ESP_IDF_VERSION_MINOR >= 1) && (CONFIG_IDF_TARGET_ESP32 || (CONFIG_ETH_USE_SPI_ETHERNET && (CONFIG_ETH_SPI_ETHERNET_KSZ8851SNL || CONFIG_ETH_SPI_ETHERNET_DM9051 || CONFIG_ETH_SPI_ETHERNET_W5500)))
+#define MICROPY_PY_NETWORK_LAN              (1)
+#else
+#define MICROPY_PY_NETWORK_LAN              (0)
+#endif
+#endif
+
+#if MICROPY_PY_NETWORK_LAN && CONFIG_ETH_USE_SPI_ETHERNET
+#ifndef MICROPY_PY_NETWORK_LAN_SPI_CLOCK_SPEED_MZ
+#if CONFIG_IDF_TARGET_ESP32 || CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32C2
+#define MICROPY_PY_NETWORK_LAN_SPI_CLOCK_SPEED_MZ       (12)
+#else
+#define MICROPY_PY_NETWORK_LAN_SPI_CLOCK_SPEED_MZ       (36)
+#endif
+#endif
+#endif

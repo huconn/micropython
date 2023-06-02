@@ -1,14 +1,20 @@
-# Select the board to build for: if not given on the command line,
-# then default to GENERIC.
+# Select the board to build for:
+ifdef BOARD_DIR
+# Custom board path - remove trailing slash and get the final component of
+# the path as the board name.
+BOARD ?= $(notdir $(BOARD_DIR:/=))
+else
+# If not given on the command line, then default to GENERIC.
 BOARD ?= GENERIC
-
-# If the build directory is not given, make it reflect the board name.
-BUILD ?= build-$(BOARD)
-
 BOARD_DIR ?= boards/$(BOARD)
+endif
+
 ifeq ($(wildcard $(BOARD_DIR)/.),)
 $(error Invalid BOARD specified: $(BOARD_DIR))
 endif
+
+# If the build directory is not given, make it reflect the board name.
+BUILD ?= build-$(BOARD)
 
 include ../../py/mkenv.mk
 
@@ -64,6 +70,11 @@ LD_FILES ?= boards/esp8266_2m.ld
 LDFLAGS += -nostdlib -T $(LD_FILES) -Map=$(@:.elf=.map) --cref
 LIBS += -L$(ESP_SDK)/lib -lmain -ljson -llwip_open -lpp -lnet80211 -lwpa -lphy -lnet80211
 
+ifeq ($(MICROPY_ESPNOW),1)
+CFLAGS += -DMICROPY_ESPNOW=1
+LIBS += -lespnow
+endif
+
 LIBGCC_FILE_NAME = $(shell $(CC) $(CFLAGS) -print-libgcc-file-name)
 LIBS += -L$(dir $(LIBGCC_FILE_NAME)) -lgcc
 
@@ -100,13 +111,17 @@ SRC_C = \
 	machine_wdt.c \
 	machine_hspi.c \
 	modesp.c \
-	modnetwork.c \
-	modutime.c \
+	network_wlan.c \
 	ets_alt_task.c \
 	fatfs_port.c \
 	posix_helpers.c \
 	hspi.c \
 	$(wildcard $(BOARD_DIR)/*.c) \
+
+ifeq ($(MICROPY_ESPNOW),1)
+SRC_C += \
+	modespnow.c
+endif
 
 LIB_SRC_C = $(addprefix lib/,\
 	libm/math.c \

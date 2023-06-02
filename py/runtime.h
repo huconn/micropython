@@ -75,6 +75,9 @@ void mp_deinit(void);
 
 void mp_sched_exception(mp_obj_t exc);
 void mp_sched_keyboard_interrupt(void);
+#if MICROPY_ENABLE_VM_ABORT
+void mp_sched_vm_abort(void);
+#endif
 void mp_handle_pending(bool raise_exc);
 
 #if MICROPY_ENABLE_SCHEDULER
@@ -195,6 +198,7 @@ NORETURN void mp_raise_NotImplementedError(mp_rom_error_text_t msg);
 
 NORETURN void mp_raise_type_arg(const mp_obj_type_t *exc_type, mp_obj_t arg);
 NORETURN void mp_raise_StopIteration(mp_obj_t arg);
+NORETURN void mp_raise_TypeError_int_conversion(mp_const_obj_t arg);
 NORETURN void mp_raise_OSError(int errno_);
 NORETURN void mp_raise_OSError_with_filename(int errno_, const char *filename);
 NORETURN void mp_raise_recursion_depth(void);

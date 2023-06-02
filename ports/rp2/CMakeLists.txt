@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.13)
 
 # Set build type to reduce firmware size
 if(NOT CMAKE_BUILD_TYPE)
@@ -31,6 +31,7 @@ endif()
 if(NOT MICROPY_BOARD_DIR)
     set(MICROPY_BOARD_DIR ${MICROPY_PORT_DIR}/boards/${MICROPY_BOARD})
 endif()
+get_filename_component(MICROPY_BOARD_DIR ${MICROPY_BOARD_DIR} ABSOLUTE)
 if(NOT EXISTS ${MICROPY_BOARD_DIR}/mpconfigboard.cmake)
     message(FATAL_ERROR "Invalid MICROPY_BOARD specified: ${MICROPY_BOARD}")
 endif()
@@ -43,6 +44,12 @@ include(${MICROPY_BOARD_DIR}/mpconfigboard.cmake)
 # Set the PICO_BOARD if it's not already set (allow a board to override it).
 if(NOT PICO_BOARD)
     string(TOLOWER ${MICROPY_BOARD} PICO_BOARD)
+endif()
+
+# Set the amount of C heap, if it's not already set.
+# If a board uses malloc then it must set this to at least 4096.
+if(NOT MICROPY_C_HEAP_SIZE)
+    set(MICROPY_C_HEAP_SIZE 0)
 endif()
 
 # Enable extmod components that will be configured by extmod.cmake.
@@ -87,7 +94,7 @@ set(MICROPY_SOURCE_LIB
     ${MICROPY_DIR}/shared/netutils/netutils.c
     ${MICROPY_DIR}/shared/netutils/trace.c
     ${MICROPY_DIR}/shared/readline/readline.c
-    ${MICROPY_DIR}/shared/runtime/gchelper_m0.s
+    ${MICROPY_DIR}/shared/runtime/gchelper_thumb1.s
     ${MICROPY_DIR}/shared/runtime/gchelper_native.c
     ${MICROPY_DIR}/shared/runtime/interrupt_char.c
     ${MICROPY_DIR}/shared/runtime/mpirq.c
@@ -107,6 +114,7 @@ set(MICROPY_SOURCE_DRIVERS
 
 set(MICROPY_SOURCE_PORT
     fatfs_port.c
+    help.c
     machine_adc.c
     machine_bitstream.c
     machine_i2c.c
@@ -120,7 +128,6 @@ set(MICROPY_SOURCE_PORT
     main.c
     modmachine.c
     modrp2.c
-    modutime.c
     mphalport.c
     mpnetworkport.c
     mpthreadport.c
@@ -131,6 +138,7 @@ set(MICROPY_SOURCE_PORT
     usbd.c
     msc_disk.c
     mbedtls/mbedtls_port.c
+    ${CMAKE_BINARY_DIR}/pins_${MICROPY_BOARD}.c
 )
 
 set(MICROPY_SOURCE_QSTR
@@ -150,9 +158,9 @@ set(MICROPY_SOURCE_QSTR
     ${PROJECT_SOURCE_DIR}/modmachine.c
     ${PROJECT_SOURCE_DIR}/modrp2.c
     ${PROJECT_SOURCE_DIR}/moduos.c
-    ${PROJECT_SOURCE_DIR}/modutime.c
     ${PROJECT_SOURCE_DIR}/rp2_flash.c
     ${PROJECT_SOURCE_DIR}/rp2_pio.c
+    ${CMAKE_BINARY_DIR}/pins_${MICROPY_BOARD}.c
 )
 
 set(PICO_SDK_COMPONENTS
@@ -248,7 +256,6 @@ if (MICROPY_PY_NETWORK_CYW43)
 
     target_compile_definitions(${MICROPY_TARGET} PRIVATE
         MICROPY_PY_NETWORK_CYW43=1
-        MICROPY_PY_NETWORK_CYW43_USE_LIB_DRIVER=1
         MICROPY_PY_SOCKET_DEFAULT_TIMEOUT_MS=30000 # default socket timeout
     )
     if (CMAKE_BUILD_TYPE MATCHES Debug)
@@ -257,8 +264,8 @@ if (MICROPY_PY_NETWORK_CYW43)
     )
     endif()
 
-    list(APPEND MICROPY_SOURCE_EXTMOD
-        ${MICROPY_DIR}/extmod/network_cyw43.c
+    list(APPEND MICROPY_SOURCE_PORT
+        machine_pin_cyw43.c
     )
 
     target_link_libraries(${MICROPY_TARGET}
@@ -281,10 +288,7 @@ if (MICROPY_PY_NETWORK_NINAW10)
         ${MICROPY_DIR}/drivers/ninaw10/nina_bt_hci.c
         ${MICROPY_DIR}/drivers/ninaw10/nina_wifi_drv.c
         ${MICROPY_DIR}/drivers/ninaw10/nina_wifi_bsp.c
-    )
-
-    list(APPEND MICROPY_SOURCE_EXTMOD
-        ${MICROPY_DIR}/extmod/network_ninaw10.c
+        ${MICROPY_DIR}/drivers/ninaw10/machine_pin_nina.c
     )
 endif()
 
@@ -323,10 +327,6 @@ if (MICROPY_PY_NETWORK_WIZNET5K)
         ${MICROPY_DIR}/lib/wiznet5k/Ethernet/wizchip_conf.c
         ${MICROPY_DIR}/lib/wiznet5k/Internet/DNS/dns.c
         ${MICROPY_DIR}/lib/wiznet5k/Internet/DHCP/dhcp.c
-    )
-
-    list(APPEND MICROPY_SOURCE_EXTMOD
-        ${MICROPY_DIR}/extmod/network_wiznet5k.c
     )
 endif()
 
@@ -369,6 +369,10 @@ target_include_directories(${MICROPY_TARGET} PRIVATE
 target_compile_options(${MICROPY_TARGET} PRIVATE
     -Wall
     -Werror
+)
+
+target_link_options(${MICROPY_TARGET} PRIVATE
+    -Wl,--defsym=__micropy_c_heap_size__=${MICROPY_C_HEAP_SIZE}
 )
 
 set_source_files_properties(
@@ -435,3 +439,37 @@ endforeach()
 
 # Include the main MicroPython cmake rules.
 include(${MICROPY_DIR}/py/mkrules.cmake)
+
+set(MICROPY_BOARDS_DIR "${MICROPY_PORT_DIR}/boards")
+set(GEN_PINS_AF_CSV "${MICROPY_BOARDS_DIR}/rp2_af.csv")
+set(GEN_PINS_PREFIX "${MICROPY_BOARDS_DIR}/rp2_prefix.c")
+set(GEN_PINS_MKPINS "${MICROPY_BOARDS_DIR}/make-pins.py")
+set(GEN_PINS_SRC "${CMAKE_BINARY_DIR}/pins_${MICROPY_BOARD}.c")
+set(GEN_PINS_HDR "${MICROPY_GENHDR_DIR}/pins.h")
+set(GEN_PINS_QSTR "${CMAKE_BINARY_DIR}/pins_qstr.h")
+set(GEN_PINS_AF_CONST "${MICROPY_GENHDR_DIR}/pins_af_const.h")
+set(GEN_PINS_AF_PY "${CMAKE_BINARY_DIR}/pins_af.py")
+
+if(EXISTS "${MICROPY_BOARDS_DIR}/${MICROPY_BOARD}/pins.csv")
+    set(GEN_PINS_BOARD_CSV "${MICROPY_BOARDS_DIR}/${MICROPY_BOARD}/pins.csv")
+    set(GEN_PINS_CSV_ARG --board "${GEN_PINS_BOARD_CSV}")
+endif()
+
+target_sources(${MICROPY_TARGET} PRIVATE
+    ${GEN_PINS_HDR}
+)
+
+# Generate pins
+add_custom_command(
+    OUTPUT ${GEN_PINS_HDR} ${GEN_PINS_SRC} ${GEN_PINS_QSTR}
+    COMMAND ${Python3_EXECUTABLE} ${GEN_PINS_MKPINS} ${GEN_PINS_CSV_ARG} --af ${GEN_PINS_AF_CSV} --prefix ${GEN_PINS_PREFIX}
+    --hdr ${GEN_PINS_HDR} --qstr ${GEN_PINS_QSTR} --af-const ${GEN_PINS_AF_CONST} --af-py ${GEN_PINS_AF_PY} > ${GEN_PINS_SRC}
+    DEPENDS
+        ${GEN_PINS_AF_CSV}
+        ${GEN_PINS_BOARD_CSV}
+        ${GEN_PINS_MKPINS}
+        ${GEN_PINS_PREFIX}
+        ${MICROPY_MPVERSION}
+    VERBATIM
+    COMMAND_EXPAND_LISTS
+)

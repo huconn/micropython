@@ -28,8 +28,8 @@
 
 // Current version of MicroPython
 #define MICROPY_VERSION_MAJOR 1
-#define MICROPY_VERSION_MINOR 19
-#define MICROPY_VERSION_MICRO 1
+#define MICROPY_VERSION_MINOR 20
+#define MICROPY_VERSION_MICRO 0
 
 // Combined version as a 32-bit number for convenience
 #define MICROPY_VERSION ( \
@@ -617,8 +617,9 @@
 #endif
 
 // Hook to run code during time consuming garbage collector operations
+// *i* is the loop index variable (e.g. can be used to run every x loops)
 #ifndef MICROPY_GC_HOOK_LOOP
-#define MICROPY_GC_HOOK_LOOP
+#define MICROPY_GC_HOOK_LOOP(i)
 #endif
 
 // Whether to provide m_tracked_calloc, m_tracked_free functions
@@ -844,9 +845,25 @@ typedef double mp_float_t;
 #define MICROPY_MODULE_ATTR_DELEGATION (MICROPY_CONFIG_ROM_LEVEL_AT_LEAST_EXTRA_FEATURES)
 #endif
 
-// Whether to call __init__ when importing builtin modules for the first time
+// Whether to call __init__ when importing builtin modules for the first time.
+// Modules using this need to handle the possibility that __init__ might be
+// called multiple times.
 #ifndef MICROPY_MODULE_BUILTIN_INIT
 #define MICROPY_MODULE_BUILTIN_INIT (MICROPY_CONFIG_ROM_LEVEL_AT_LEAST_EXTRA_FEATURES)
+#endif
+
+// Whether to allow built-in modules to have sub-packages (by making the
+// sub-package a member of their locals dict). Sub-packages should not be
+// registered with MP_REGISTER_MODULE, instead they should be added as
+// members of the parent's globals dict. To match CPython behavior,
+// their __name__ should be "foo.bar"(i.e. QSTR_foo_dot_bar) which will
+// require an entry in qstrdefs, although it does also work to just call
+// it "bar". Also, because subpackages can be accessed without being
+// imported (e.g. as foo.bar after `import foo`), they should not
+// have __init__ methods. Instead, the top-level package's __init__ should
+// initialise all sub-packages.
+#ifndef MICROPY_MODULE_BUILTIN_SUBPACKAGES
+#define MICROPY_MODULE_BUILTIN_SUBPACKAGES (MICROPY_CONFIG_ROM_LEVEL_AT_LEAST_EVERYTHING)
 #endif
 
 // Whether to support module-level __getattr__ (see PEP 562)
@@ -902,6 +919,16 @@ typedef double mp_float_t;
 // Whether to use internally defined *printf() functions (otherwise external ones)
 #ifndef MICROPY_USE_INTERNAL_PRINTF
 #define MICROPY_USE_INTERNAL_PRINTF (1)
+#endif
+
+// The mp_print_t printer used for printf output when MICROPY_USE_INTERNAL_PRINTF is enabled
+#ifndef MICROPY_INTERNAL_PRINTF_PRINTER
+#define MICROPY_INTERNAL_PRINTF_PRINTER (&mp_plat_print)
+#endif
+
+// Whether to support mp_sched_vm_abort to asynchronously abort to the top level.
+#ifndef MICROPY_ENABLE_VM_ABORT
+#define MICROPY_ENABLE_VM_ABORT (0)
 #endif
 
 // Support for internal scheduler
@@ -1458,10 +1485,19 @@ typedef double mp_float_t;
 #define MICROPY_PY_USELECT_SELECT (1)
 #endif
 
-// Whether to provide "utime" module functions implementation
-// in terms of mp_hal_* functions.
-#ifndef MICROPY_PY_UTIME_MP_HAL
-#define MICROPY_PY_UTIME_MP_HAL (0)
+// Whether to provide the "utime" module
+#ifndef MICROPY_PY_UTIME
+#define MICROPY_PY_UTIME (MICROPY_CONFIG_ROM_LEVEL_AT_LEAST_BASIC_FEATURES)
+#endif
+
+// Whether to provide utime.gmtime/localtime/mktime functions
+#ifndef MICROPY_PY_UTIME_GMTIME_LOCALTIME_MKTIME
+#define MICROPY_PY_UTIME_GMTIME_LOCALTIME_MKTIME (0)
+#endif
+
+// Whether to provide utime.time/time_ns functions
+#ifndef MICROPY_PY_UTIME_TIME_TIME_NS
+#define MICROPY_PY_UTIME_TIME_TIME_NS (0)
 #endif
 
 // Period of values returned by utime.ticks_ms(), ticks_us(), ticks_cpu()
@@ -1733,6 +1769,10 @@ typedef double mp_float_t;
 
 #ifndef MICROPY_WRAP_MP_SCHED_SCHEDULE
 #define MICROPY_WRAP_MP_SCHED_SCHEDULE(f) f
+#endif
+
+#ifndef MICROPY_WRAP_MP_SCHED_VM_ABORT
+#define MICROPY_WRAP_MP_SCHED_VM_ABORT(f) f
 #endif
 
 /*****************************************************************************/

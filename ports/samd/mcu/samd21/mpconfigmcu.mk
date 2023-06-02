@@ -2,7 +2,9 @@ CFLAGS_MCU += -mtune=cortex-m0plus -mcpu=cortex-m0plus -msoft-float
 
 MPY_CROSS_MCU_ARCH = armv6m
 
-SRC_S += shared/runtime/gchelper_m0.s
+MICROPY_HW_CODESIZE ?= 184K
+
+SRC_S += shared/runtime/gchelper_thumb1.s
 
 LIBM_SRC_C +=  $(addprefix lib/libm/,\
 	acoshf.c \

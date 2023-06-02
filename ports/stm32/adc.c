@@ -160,7 +160,8 @@
 #define VBAT_DIV (4)
 #elif defined(STM32G0) || defined(STM32G4)
 #define VBAT_DIV (3)
-#elif defined(STM32H743xx) || defined(STM32H747xx) || \
+#elif defined(STM32H723xx) || defined(STM32H733xx) || \
+    defined(STM32H743xx) || defined(STM32H747xx) || \
     defined(STM32H7A3xx) || defined(STM32H7A3xxQ) || \
     defined(STM32H7B3xx) || defined(STM32H7B3xxQ) || \
     defined(STM32H750xx)
@@ -169,6 +170,7 @@
     defined(STM32L451xx) || defined(STM32L452xx) || \
     defined(STM32L462xx) || defined(STM32L475xx) || \
     defined(STM32L476xx) || defined(STM32L496xx) || \
+    defined(STM32L4A6xx) || \
     defined(STM32WB55xx)
 #define VBAT_DIV (3)
 #elif defined(STM32L152xE)

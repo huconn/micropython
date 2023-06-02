@@ -32,15 +32,16 @@ SRC_EXTMOD_C += \
 	extmod/modusocket.c \
 	extmod/modussl_axtls.c \
 	extmod/modussl_mbedtls.c \
+	extmod/modutime.c \
 	extmod/modutimeq.c \
 	extmod/moduwebsocket.c \
 	extmod/moduzlib.c \
 	extmod/modwebrepl.c \
 	extmod/network_cyw43.c \
+	extmod/network_lwip.c \
 	extmod/network_ninaw10.c \
 	extmod/network_wiznet5k.c \
 	extmod/uos_dupterm.c \
-	extmod/utime_mphal.c \
 	extmod/vfs.c \
 	extmod/vfs_blockdev.c \
 	extmod/vfs_fat.c \
@@ -171,7 +172,6 @@ SRC_THIRDPARTY_C += $(addprefix $(MBEDTLS_DIR)/library/,\
 	md4.c \
 	md5.c \
 	md.c \
-	md_wrap.c \
 	oid.c \
 	padlock.c \
 	pem.c \
@@ -196,9 +196,11 @@ SRC_THIRDPARTY_C += $(addprefix $(MBEDTLS_DIR)/library/,\
 	ssl_cli.c \
 	ssl_cookie.c \
 	ssl_srv.c \
+	ssl_msg.c \
 	ssl_ticket.c \
 	ssl_tls.c \
 	timing.c \
+	constant_time.c \
 	x509.c \
 	x509_create.c \
 	x509_crl.c \
@@ -292,7 +294,7 @@ SRC_THIRDPARTY_C += $(addprefix $(BTREE_DIR)/,\
 CFLAGS_EXTMOD += -DMICROPY_PY_BTREE=1
 # we need to suppress certain warnings to get berkeley-db to compile cleanly
 # and we have separate BTREE_DEFS so the definitions don't interfere with other source code
-$(BUILD)/$(BTREE_DIR)/%.o: CFLAGS += -Wno-old-style-definition -Wno-sign-compare -Wno-unused-parameter $(BTREE_DEFS)
+$(BUILD)/$(BTREE_DIR)/%.o: CFLAGS += -Wno-old-style-definition -Wno-sign-compare -Wno-unused-parameter -Wno-deprecated-non-prototype -Wno-unknown-warning-option $(BTREE_DEFS)
 $(BUILD)/extmod/modbtree.o: CFLAGS += $(BTREE_DEFS)
 endif
 
@@ -300,10 +302,22 @@ endif
 # networking
 
 ifeq ($(MICROPY_PY_NETWORK_CYW43),1)
+CYW43_DIR = lib/cyw43-driver
+GIT_SUBMODULES += $(CYW43_DIR)
 CFLAGS_EXTMOD += -DMICROPY_PY_NETWORK_CYW43=1
-DRIVERS_SRC_C += drivers/cyw43/cyw43_ctrl.c drivers/cyw43/cyw43_lwip.c
-LIBS += $(TOP)/drivers/cyw43/libcyw43.a
+SRC_THIRDPARTY_C += $(addprefix $(CYW43_DIR)/src/,\
+	cyw43_ctrl.c \
+	cyw43_lwip.c \
+	cyw43_ll.c \
+	cyw43_sdio.c \
+	cyw43_stats.c \
+	)
+ifeq ($(MICROPY_PY_BLUETOOTH),1)
+DRIVERS_SRC_C += drivers/cyw43/cywbt.c
 endif
+
+$(BUILD)/$(CYW43_DIR)/src/cyw43_%.o: CFLAGS += -std=c11
+endif # MICROPY_PY_NETWORK_CYW43
 
 ifneq ($(MICROPY_PY_NETWORK_WIZNET5K),)
 ifneq ($(MICROPY_PY_NETWORK_WIZNET5K),0)

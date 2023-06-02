@@ -1,14 +1,20 @@
-# Select the board to build for: if not given on the command line,
-# then default to RA6M2_EK.
-BOARD ?= RA6M2_EK
-
-# If the build directory is not given, make it reflect the board name.
-BUILD ?= build-$(BOARD)
-
+# Select the board to build for:
+ifdef BOARD_DIR
+# Custom board path - remove trailing slash and get the final component of
+# the path as the board name.
+BOARD ?= $(notdir $(BOARD_DIR:/=))
+else
+# If not given on the command line, then default to RA6M2_EK.
+BOARD ?= EK_RA6M2
 BOARD_DIR ?= boards/$(BOARD)
+endif
+
 ifeq ($(wildcard $(BOARD_DIR)/.),)
 $(error Invalid BOARD specified: $(BOARD_DIR))
 endif
+
+# If the build directory is not given, make it reflect the board name.
+BUILD ?= build-$(BOARD)
 
 ifeq ($(BOARD),RA4M1_CLICKER)
 BOARD_LOW = ra4m1_ek
@@ -17,28 +23,28 @@ CMSIS_MCU_CAP = RA4M1
 USE_FSP_LPM = 0
 endif
 
-ifeq ($(BOARD),RA4M1_EK)
+ifeq ($(BOARD),EK_RA4M1)
 BOARD_LOW = ra4m1_ek
 CMSIS_MCU_LOW = ra4m1
 CMSIS_MCU_CAP = RA4M1
 USE_FSP_LPM = 0
 endif
 
-ifeq ($(BOARD),RA4W1_EK)
+ifeq ($(BOARD),EK_RA4W1)
 BOARD_LOW = ra4w1_ek
 CMSIS_MCU_LOW = ra4w1
 CMSIS_MCU_CAP = RA4W1
 USE_FSP_LPM = 1
 endif
 
-ifeq ($(BOARD),RA6M1_EK)
+ifeq ($(BOARD),EK_RA6M1)
 BOARD_LOW = ra6m1_ek
 CMSIS_MCU_LOW = ra6m1
 CMSIS_MCU_CAP = RA6M1
 USE_FSP_LPM = 1
 endif
 
-ifeq ($(BOARD),RA6M2_EK)
+ifeq ($(BOARD),EK_RA6M2)
 BOARD_LOW = ra6m2_ek
 CMSIS_MCU_LOW = ra6m2
 CMSIS_MCU_CAP = RA6M2
@@ -83,6 +89,7 @@ SYSTEM_FILE ?= lib/fsp/ra/fsp/src/bsp/cmsis/Device/RENESAS/Source/system.o
 # Select the cross compile prefix
 CROSS_COMPILE ?= arm-none-eabi-
 
+INC += -imacros boards/compiler_barrier.h
 INC += -I.
 INC += -I$(TOP)
 INC += -I$(BUILD)
@@ -290,6 +297,7 @@ DRIVERS_SRC_C += $(addprefix drivers/,\
 SRC_C += \
 	boardctrl.c \
 	main.c \
+	ra_hal.c \
 	ra_it.c \
 	mphalport.c \
 	mpthreadport.c \
@@ -312,20 +320,17 @@ SRC_C += \
 	machine_pin.c \
 	machine_rtc.c \
 	modmachine.c \
-	modutime.c \
 	extint.c \
 	usrsw.c \
 	flash.c \
 	flashbdev.c \
 	storage.c \
 	fatfs_port.c \
-	$(BOARD_DIR)/src/hal_entry.c \
 	$(wildcard $(BOARD_DIR)/*.c)
 
 SRC_C += $(addprefix $(BOARD_DIR)/ra_gen/,\
 	common_data.c \
 	hal_data.c \
-	main.c \
 	pin_data.c \
 	vector_data.c \
 	)
@@ -335,12 +340,7 @@ SRC_O += \
 	$(SYSTEM_FILE)
 
 SRC_O += \
-	shared/runtime/gchelper_m3.o
-
-HAL_SRC_C += $(addprefix $(HAL_DIR)/ra/board/$(BOARD_LOW)/,\
-	board_init.c \
-	board_leds.c \
-	)
+	shared/runtime/gchelper_thumb2.o
 
 HAL_SRC_C += $(addprefix $(HAL_DIR)/ra/fsp/src/bsp/mcu/all/,\
 	bsp_clocks.c \

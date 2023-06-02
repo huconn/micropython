@@ -414,7 +414,7 @@ STATIC void pre_process_options(int argc, char **argv) {
                     #if MICROPY_PY_THREAD
                     mp_thread_is_realtime_enabled = true;
                     #endif
-                    // main thread was already intialized before the option
+                    // main thread was already initialized before the option
                     // was parsed, so we have to enable realtime here.
                     mp_thread_set_realtime();
                 #endif
@@ -664,7 +664,10 @@ MP_NOINLINE int main_(int argc, char **argv) {
                     return handle_uncaught_exception(nlr.ret_val) & 0xff;
                 }
 
-                if (mp_obj_is_package(mod) && !subpkg_tried) {
+                // If this module is a package, see if it has a `__main__.py`.
+                mp_obj_t dest[2];
+                mp_load_method_protected(mod, MP_QSTR___path__, dest, true);
+                if (dest[0] != MP_OBJ_NULL && !subpkg_tried) {
                     subpkg_tried = true;
                     vstr_t vstr;
                     int len = strlen(argv[a + 1]);
@@ -699,6 +702,7 @@ MP_NOINLINE int main_(int argc, char **argv) {
             char *basedir = realpath(argv[a], pathbuf);
             if (basedir == NULL) {
                 mp_printf(&mp_stderr_print, "%s: can't open file '%s': [Errno %d] %s\n", argv[0], argv[a], errno, strerror(errno));
+                free(pathbuf);
                 // CPython exits with 2 in such case
                 ret = 2;
                 break;
