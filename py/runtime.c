@@ -69,11 +69,10 @@ void mp_init(void) {
     // no pending exceptions to start with
     MP_STATE_THREAD(mp_pending_exception) = MP_OBJ_NULL;
     #if MICROPY_ENABLE_SCHEDULER
+    // no pending callbacks to start with
+    MP_STATE_VM(sched_state) = MP_SCHED_IDLE;
     #if MICROPY_SCHEDULER_STATIC_NODES
-    if (MP_STATE_VM(sched_head) == NULL) {
-        // no pending callbacks to start with
-        MP_STATE_VM(sched_state) = MP_SCHED_IDLE;
-    } else {
+    if (MP_STATE_VM(sched_head) != NULL) {
         // pending callbacks are on the list, eg from before a soft reset
         MP_STATE_VM(sched_state) = MP_SCHED_PENDING;
     }
@@ -136,13 +135,17 @@ void mp_init(void) {
     #endif
 
     #if MICROPY_PY_SYS_PATH_ARGV_DEFAULTS
-    mp_obj_list_init(MP_OBJ_TO_PTR(mp_sys_path), 0);
+    #if MICROPY_PY_SYS_PATH
+    mp_sys_path = mp_obj_new_list(0, NULL);
     mp_obj_list_append(mp_sys_path, MP_OBJ_NEW_QSTR(MP_QSTR_)); // current dir (or base dir of the script)
     #if MICROPY_MODULE_FROZEN
     mp_obj_list_append(mp_sys_path, MP_OBJ_NEW_QSTR(MP_QSTR__dot_frozen));
     #endif
+    #endif
+    #if MICROPY_PY_SYS_ARGV
     mp_obj_list_init(MP_OBJ_TO_PTR(mp_sys_argv), 0);
     #endif
+    #endif // MICROPY_PY_SYS_PATH_ARGV_DEFAULTS
 
     #if MICROPY_PY_SYS_ATEXIT
     MP_STATE_VM(sys_exitfunc) = mp_const_none;
@@ -186,6 +189,12 @@ void mp_deinit(void) {
     #ifdef MICROPY_PORT_DEINIT_FUNC
     MICROPY_PORT_DEINIT_FUNC;
     #endif
+}
+
+void mp_globals_locals_set_from_nlr_jump_callback(void *ctx_in) {
+    nlr_jump_callback_node_globals_locals_t *ctx = ctx_in;
+    mp_globals_set(ctx->globals);
+    mp_locals_set(ctx->locals);
 }
 
 mp_obj_t MICROPY_WRAP_MP_LOAD_NAME(mp_load_name)(qstr qst) {
@@ -1582,39 +1591,35 @@ void mp_import_all(mp_obj_t module) {
 
 mp_obj_t mp_parse_compile_execute(mp_lexer_t *lex, mp_parse_input_kind_t parse_input_kind, mp_obj_dict_t *globals, mp_obj_dict_t *locals) {
     // save context
-    mp_obj_dict_t *volatile old_globals = mp_globals_get();
-    mp_obj_dict_t *volatile old_locals = mp_locals_get();
+    nlr_jump_callback_node_globals_locals_t ctx;
+    ctx.globals = mp_globals_get();
+    ctx.locals = mp_locals_get();
 
     // set new context
     mp_globals_set(globals);
     mp_locals_set(locals);
 
-    nlr_buf_t nlr;
-    if (nlr_push(&nlr) == 0) {
-        qstr source_name = lex->source_name;
-        mp_parse_tree_t parse_tree = mp_parse(lex, parse_input_kind);
-        mp_obj_t module_fun = mp_compile(&parse_tree, source_name, parse_input_kind == MP_PARSE_SINGLE_INPUT);
+    // set exception handler to restore context if an exception is raised
+    nlr_push_jump_callback(&ctx.callback, mp_globals_locals_set_from_nlr_jump_callback);
 
-        mp_obj_t ret;
-        if (MICROPY_PY_BUILTINS_COMPILE && globals == NULL) {
-            // for compile only, return value is the module function
-            ret = module_fun;
-        } else {
-            // execute module function and get return value
-            ret = mp_call_function_0(module_fun);
-        }
+    qstr source_name = lex->source_name;
+    mp_parse_tree_t parse_tree = mp_parse(lex, parse_input_kind);
+    mp_obj_t module_fun = mp_compile(&parse_tree, source_name, parse_input_kind == MP_PARSE_SINGLE_INPUT);
 
-        // finish nlr block, restore context and return value
-        nlr_pop();
-        mp_globals_set(old_globals);
-        mp_locals_set(old_locals);
-        return ret;
+    mp_obj_t ret;
+    if (MICROPY_PY_BUILTINS_COMPILE && globals == NULL) {
+        // for compile only, return value is the module function
+        ret = module_fun;
     } else {
-        // exception; restore context and re-raise same exception
-        mp_globals_set(old_globals);
-        mp_locals_set(old_locals);
-        nlr_jump(nlr.ret_val);
+        // execute module function and get return value
+        ret = mp_call_function_0(module_fun);
     }
+
+    // deregister exception handler and restore context
+    nlr_pop_jump_callback(true);
+
+    // return value
+    return ret;
 }
 
 #endif // MICROPY_ENABLE_COMPILER

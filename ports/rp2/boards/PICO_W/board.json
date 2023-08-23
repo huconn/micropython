@@ -4,9 +4,10 @@
     ],
     "docs": "",
     "features": [
-        "Breadboard friendly",
-        "Castellated Pads",
-        "Micro USB",
+        "BLE",
+        "Dual-core",
+        "External Flash",
+        "USB",
         "WiFi"
     ],
     "id": "rp2-pico-w",
